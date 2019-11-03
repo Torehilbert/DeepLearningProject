@@ -3,27 +3,41 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+def Learn(policy, optimizer, rollout, discount_factor):
+    ''' REINFORCE learn algorithm
 
-class PolicyNet(nn.Module):
-    def __init__(self, inFeatures, hiddenSize, outFeatures):
-        super(PolicyNet, self).__init__()
+    params:
+        policy      : torch module network
+        optimizer   : torch optimizer
+        rollout     : list of (s,a,r) tuples
+    
+    returns:
+        pass
 
-        self.l1 = nn.Linear(inFeatures, hiddenSize)
-        self.l2 = nn.Linear(hiddenSize, outFeatures)
+    '''
 
-    def forward(self, x):
-        x = F.relu(self.l1(x))
-        return F.softmax(self.l2(x), dim=1)
+    rollout = np.array(rollout)
+    states = np.vstack(rollout[:, 0])
+    actions = np.vstack(rollout[:, 1])
+    rewards = np.array(rollout[:, 2], dtype=float)
+    returns = _expected_future_rewards(rewards, discount_factor)
 
-    def get_action(self, state, explore=False):
-        with torch.no_grad():
-            actionProbabilities = self(torch.from_numpy(np.atleast_2d(state)).float())
-        if(explore):
-            action = (np.cumsum(actionProbabilities.numpy()) > np.random.rand()).argmax()
-        else:
-            action = (actionProbabilities.numpy()).argmax()
+    optimizer.zero_grad()
+    action_probabilities = policy(torch.from_numpy(states).float()).gather(1, torch.from_numpy(actions)).view(-1)
+    loss = _loss(action_probabilities, returns)
+    loss.backward()
+    optimizer.step()
 
-        return action, actionProbabilities
+    return np.sum(rewards), loss.item()
 
-    def loss(self, actionProbabilities, returns):
-        return -torch.mean(torch.mul(torch.log(actionProbabilities), returns))
+
+def _expected_future_rewards(rewards, discount_factor):
+    returns = np.zeros(len(rewards))
+    returns[-1] = rewards[-1]
+    for t in reversed(range(len(rewards)-1)):
+        returns[t] = rewards[t] + discount_factor*returns[t+1]
+    return returns
+
+
+def _loss(action_probabilities, returns):
+    return -torch.mean(torch.mul(torch.log(action_probabilities), torch.from_numpy(returns).float()))

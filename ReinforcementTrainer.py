@@ -3,7 +3,7 @@ import numpy as np
 
 from TimeManager import TimeManager as TM
 from StatisticsContainer import MyData as MD
-
+import REINFORCE
 
 class ReinforcementTrainer:
     def __init__(self, policyNetwork, environment, optimizer):
@@ -20,7 +20,7 @@ class ReinforcementTrainer:
             returns[t] = rewards[t] + discount_factor*returns[t+1]
         return returns
 
-    def train(self, num_episodes=10000, val_freq=100):
+    def train(self, num_episodes=1000, val_freq=100):
         print('Starting training...')
         timer = TM(2).start()
         self.data = MD(3, maxsizes=[num_episodes, num_episodes, num_episodes//val_freq])
@@ -38,23 +38,11 @@ class ReinforcementTrainer:
                     break
             timer.stop_timer(0)
 
-            # prepare batch
-            rollout = np.array(rollout)
-            states = np.vstack(rollout[:, 0])
-            actions = np.vstack(rollout[:, 1])
-            rewards = np.array(rollout[:, 2], dtype=float)
-            returns = self.compute_returns(rewards, self.discount_factor)
-
-            # policy gradient update
-            self.optimizer.zero_grad()
-            a_probs = self.policy(torch.from_numpy(states).float()).gather(1, torch.from_numpy(actions)).view(-1)
-            loss = self.policy.loss(a_probs, torch.from_numpy(returns).float())
-            loss.backward()
-            self.optimizer.step()
+            totalReward, loss = REINFORCE.Learn(self.policy, self.optimizer, rollout, self.discount_factor)
 
             # bookkeeping
-            self.data.add_data(sum(rewards), 0)
-            self.data.add_data(loss.item(), 1)
+            self.data.add_data(totalReward, 0)
+            self.data.add_data(loss, 1)
 
             # print
             if (i+1) % val_freq == 0:

@@ -7,12 +7,13 @@ import matplotlib.pyplot as plt
 import time
 
 import REINFORCE as R
+from network_architectures import PolicyNet
 from ReinforcementTrainer import ReinforcementTrainer as RLTrainer
 
 if __name__ == "__main__":
     # Testing Net
-    environmentName = 'LunarLander-v2' # 'CartPole-v0' 
-    hiddenSize = 64
+    environmentName = 'CartPole-v0' # 'LunarLander-v2' # # 
+    hiddenSize = 24
 
     env = gym.make(environmentName)
 
@@ -23,17 +24,19 @@ if __name__ == "__main__":
     num_episodes = 1000
     rollout_limit = 500  # max rollout length
     discount_factor = 1.0  # reward discount factor (gamma), 1.0 = no discount
-    learning_rate = 0.001  # you know this by now
+    learning_rate = 0.002  # you know this by now
     val_freq = 100  # validation frequency
 
     # setup policy network
-    policy = R.PolicyNet(nInputs, hiddenSize, nActions)
+    policy = PolicyNet(nInputs, hiddenSize, nActions)
     optimizer = optim.Adam(policy.parameters(), lr=learning_rate)
 
     # train policy network
     trainer = RLTrainer(policy, env, optimizer)
+    trainer.rollout_limit = rollout_limit
+    trainer.discount_factor = discount_factor
 
-    thread = threading.Thread(target=trainer.train)
+    thread = threading.Thread(target=trainer.train, kwargs={'num_episodes':num_episodes})
     thread.start()
 
     plt.figure()
@@ -54,5 +57,5 @@ if __name__ == "__main__":
 
     print('done')
 
-    plt.show()
+    # plt.show()
     #trainer.train()
