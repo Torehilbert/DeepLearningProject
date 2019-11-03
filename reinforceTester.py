@@ -1,3 +1,6 @@
+import sys
+print(sys.executable)
+
 import torch
 import torch.optim as optim
 import numpy as np
@@ -7,13 +10,16 @@ import matplotlib.pyplot as plt
 import time
 
 import REINFORCE as R
-from network_architectures import PolicyNet
+
+from TrainVisualizer import TrainTracker
+
+from network_architectures import PolicyNet, ValueNet
 from ReinforcementTrainer import ReinforcementTrainer as RLTrainer
 
 if __name__ == "__main__":
     # Testing Net
-    environmentName = 'CartPole-v0' # 'LunarLander-v2' # # 
-    hiddenSize = 24
+    environmentName = 'CartPole-v0'  #'LunarLander-v2' 
+    hiddenSize = 512
 
     env = gym.make(environmentName)
 
@@ -24,10 +30,11 @@ if __name__ == "__main__":
     num_episodes = 1000
     rollout_limit = 500  # max rollout length
     discount_factor = 1.0  # reward discount factor (gamma), 1.0 = no discount
-    learning_rate = 0.002  # you know this by now
+    learning_rate = 0.001  # you know this by now
     val_freq = 100  # validation frequency
 
     # setup policy network
+    valueNet = ValueNet(nInputs, 512)
     policy = PolicyNet(nInputs, hiddenSize, nActions)
     optimizer = optim.Adam(policy.parameters(), lr=learning_rate)
 
@@ -38,24 +45,13 @@ if __name__ == "__main__":
 
     thread = threading.Thread(target=trainer.train, kwargs={'num_episodes':num_episodes})
     thread.start()
+    time.sleep(1)
 
-    plt.figure()
-    while(thread.is_alive()):
-        plt.clf()
-
-        plt.subplot(2, 1, 1)
-        plt.plot(trainer.data.data[0])
-        plt.xlim([0, trainer.data.sizes[0]])
-        plt.ylim([0, 210])
-
-        plt.subplot(2, 1, 2)
-        plt.plot([None] + trainer.data.data[2])
-        plt.xlim([0, trainer.data.sizes[2]])
-        plt.ylim([0, 210])
-
-        plt.pause(0.25)
+    # follow training
+    tv = TrainTracker([trainer.dataTrain, trainer.dataEval], thread, smooth_alphas=[0.02, 1])
+    tv.initialize()
+    tv.format(0, 'Iteration (training)', 'Training reward', [0, num_episodes])
+    tv.format(1, 'Iteration (validation)', 'Validation reward', [0, num_episodes//val_freq - 1])
+    tv.start(update_interval=0.25)
 
     print('done')
-
-    # plt.show()
-    #trainer.train()

@@ -3,6 +3,7 @@ import numpy as np
 
 from TimeManager import TimeManager as TM
 from StatisticsContainer import MyData as MD
+from StatisticsContainer import Data as Data
 import REINFORCE
 
 class ReinforcementTrainer:
@@ -12,6 +13,8 @@ class ReinforcementTrainer:
         self.optimizer = optimizer
         self.rollout_limit = 500
         self.discount_factor = 1.0
+        self.dataTrain = Data()
+        self.dataEval = Data()
 
     def compute_returns(self, rewards, discount_factor):
         returns = np.zeros(len(rewards))
@@ -23,9 +26,8 @@ class ReinforcementTrainer:
     def train(self, num_episodes=1000, val_freq=100):
         print('Starting training...')
         timer = TM(2).start()
-        self.data = MD(3, maxsizes=[num_episodes, num_episodes, num_episodes//val_freq])
+
         for i in range(num_episodes):
-            # simulate episode
             rollout = []
             s = self.env.reset()
             timer.start_timer(0)
@@ -40,16 +42,14 @@ class ReinforcementTrainer:
 
             totalReward, loss = REINFORCE.Learn(self.policy, self.optimizer, rollout, self.discount_factor)
 
-            # bookkeeping
-            self.data.add_data(totalReward, 0)
-            self.data.add_data(loss, 1)
+            self.dataTrain.add_data(totalReward)
 
-            # print
             if (i+1) % val_freq == 0:
                 timer.start_timer(1)
                 validation_reward = self.validate(run_count=10)
-                self.data.add_data(validation_reward, 2)
-                print('{:5d}. mean training reward: {:6.2f}, mean validation reward: {:6.2f}, mean loss: {:7.4f}'.format(i+1, np.mean(self.data.extract_recent(0, val_freq)), validation_reward, np.mean(self.data.extract_recent(1, val_freq))))
+                self.dataEval.add_data(validation_reward)
+                print(i+1)
+                #print('{:5d}. mean training reward: {:6.2f}, mean validation reward: {:6.2f}, mean loss: {:7.4f}'.format(i+1, np.mean(self.data.extract_recent(0, val_freq)), validation_reward, np.mean(self.data.extract_recent(1, val_freq))))
                 timer.stop_timer(1)
         timeElapsed = timer.stop()
         print('Finished training - Time elapsed: %d:%d:%d (Sim=%d%%, Val=%d%%)' % (timeElapsed[0], timeElapsed[1], timeElapsed[2], int(100*timer.fractions[0]), int(100*timer.fractions[1])))

@@ -3,11 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+
 class PolicyNet(nn.Module):
     def __init__(self, inFeatures, hiddenSize, outFeatures):
         super(PolicyNet, self).__init__()
 
-        self.l1 = nn.Linear(inFeatures, hiddenSize, bias=False, )
+        self.l1 = nn.Linear(inFeatures, hiddenSize, bias=False)
         self.l2 = nn.Linear(hiddenSize, outFeatures)
 
     def forward(self, x):
@@ -23,3 +24,15 @@ class PolicyNet(nn.Module):
             action = (actionProbabilities.numpy()).argmax()
 
         return action, actionProbabilities
+
+
+class ValueNet(nn.module):
+    def __init__(self, inFeatures, hiddenSize):
+        super(ValueNet, self).__init__()
+
+        self.l1 = nn.Linear(inFeatures, hiddenSize)
+        self.l2 = nn.Linear(hiddenSize, 1)
+
+    def forward(self, x):
+        x = F.relu(self.l1(x))
+        return self.l2(x)
