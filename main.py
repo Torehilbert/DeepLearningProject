@@ -5,67 +5,62 @@ import threading
 import time
 import os
 
-from TrainVisualizer import TrainTracker
+from Tracker import Tracker
 from network_architectures import PolicyNet, PolicyNetDouble
-from ReinforcementTrainer import ReinforcementTrainer as RLTrainer
+from Trainer import Trainer as trainer
 
+
+LUNAR_LANDER = 'LunarLander-v2'
+CART_POLE = 'CartPole-v0'
 
 if __name__ == "__main__":
-    output_folder = r"C:\Users\ToreH\OneDrive - Københavns Universitet\Skole\02456 Deep Learning\Project\DeepLearningProject\output"
-    
-    load_ini_model = True
-    save_final_model = True
-    final_model_path = r"C:\Source\DeepLearningProject\IniModel6464\model_final.pt"
-    ini_model_path = final_model_path # r"C:\Source\DeepLearningProject\IniModel6464\iniModel5000.pt"
+    # Parameters
+    output_folder = r"C:\Source\DeepLearningProject\output"
+    initial_model = (False, r"C:\Source\DeepLearningProject\Input\model_initial.pt")
+    final_model = (True, r"C:\Source\DeepLearningProject\output\model_final.pt")
 
-    # Testing Net
-    environmentName = 'LunarLander-v2'  #'CartPole-v0'  #
-    hiddenSizes = [64,64]
+    hiddenSizes = [64, 64]
+    number_of_batches = 25000
+    batch_size = 10
+    validation_frequency = 500
+    learning_rate = 0.002
+    use_baseline = True
+    rollout_limit = 500
+    discount_factor = 1.0
 
+    # Environment
+    environmentName = LUNAR_LANDER
     env = gym.make(environmentName)
 
-    nInputs = env.observation_space.shape[0]
-    nActions = env.action_space.n
+    # Policy
+    policy = PolicyNetDouble(env.observation_space.shape[0], hiddenSizes, env.action_space.n)
+    if(initial_model[0]):
+        policy.load_state_dict(torch.load(initial_model[1]))
 
-    # training settings
-    batch_size = 10         # hyper 1 parameter #10 is good
-    num_episodes = (5000//batch_size)*batch_size
-    val_freq = ((num_episodes//10)//batch_size)*batch_size
+    # Optimizer
+    optimizer = optim.Adam(policy.parameters(), lr=learning_rate)
 
-    lr_policy = 0.002        # hyper 2 parameter #0.05 is good ()
-    use_baseline = True     # hyper 3 parameter
+    # Trainer
+    trainer = trainer(policy=policy,
+                        environment=env,
+                        optimizer=optimizer,
+                        rollout_limit=rollout_limit,
+                        discount_factor=discount_factor,
+                        model_path_save=final_model[1] if final_model[0] else None)
 
-    rollout_limit = 500  # max rollout length
-    discount_factor = 1.0  # reward discount factor (gamma), 1.0 = no discount
-
-
-    # setup policy network
-    #policy = PolicyNet(nInputs, hiddenSize, nActions)
-    policy = PolicyNetDouble(nInputs, hiddenSizes, nActions)
-    if(load_ini_model):
-        policy.load_state_dict(torch.load(ini_model_path))
-
-    optimizer = optim.Adam(policy.parameters(), lr=lr_policy)
-
-    # train policy network
-    trainer = RLTrainer(policy, env, optimizer)
-    trainer.rollout_limit = rollout_limit
-    trainer.discount_factor = discount_factor
-
-    thread = threading.Thread(target=trainer.train, kwargs={'num_episodes':num_episodes, 'batch_size':batch_size, 'use_baseline':use_baseline, 'model_output_folder':output_folder})
+    thread = threading.Thread(target=trainer.train,
+                                kwargs={'number_of_batches': number_of_batches,
+                                        'batch_size': batch_size,
+                                        'val_freq': validation_frequency,
+                                        'use_baseline': use_baseline})
     thread.start()
     time.sleep(1)
 
-    # track training
-    outfiles = [os.path.join(output_folder, 'train_reward.csv'), 
-                os.path.join(output_folder, 'validation_reward.csv')]
-
-    tv = TrainTracker([trainer.dataTrain, trainer.dataEval], thread, smooth_alphas=[0.05, 1], out_filepaths=outfiles)
-    tv.initialize()
-    tv.format(0, 'Iteration (training)', 'Training reward', [0, num_episodes])
-    tv.format(1, 'Iteration (validation)', 'Validation reward', [0, num_episodes//val_freq])
+    # Tracker (save training data to files and show plots etc)
+    csv_train_rewards = os.path.join(output_folder, 'train_reward.csv')
+    csv_eval_rewards = os.path.join(output_folder, 'validation_reward.csv')
+    tv = Tracker(data_containers=[trainer.data_buffer_train, trainer.data_buffer_eval],
+                        train_thread=thread,
+                        smooth_alphas=[0.05, 1],
+                        out_filepaths=[csv_train_rewards, csv_eval_rewards])
     tv.start(update_interval=0.25)
-
-    # save final model
-    if(save_final_model):
-        torch.save(policy.state_dict(), final_model_path)

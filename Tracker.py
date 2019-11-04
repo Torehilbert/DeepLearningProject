@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import os
 
 
-class TrainTracker:
+class Tracker:
     def __init__(self, data_containers, train_thread, smooth_alphas=1, out_filepaths=None):
         if(not hasattr(data_containers, '__len__')):
             data_containers = [data_containers]
@@ -98,7 +98,7 @@ class TrainTracker:
 
         current = start if start is not None else data[0]
         for i in range(len(data)):
-            data[i] = alpha*data[i] + (1-alpha)*current
+            data[i] = alpha * data[i] + (1 - alpha) * current
             current = data[i]
 
         return data
