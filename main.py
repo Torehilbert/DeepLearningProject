@@ -6,16 +6,21 @@ import time
 import os
 
 from TrainVisualizer import TrainTracker
-from network_architectures import PolicyNet, ValueNet
+from network_architectures import PolicyNet, PolicyNetDouble
 from ReinforcementTrainer import ReinforcementTrainer as RLTrainer
 
 
 if __name__ == "__main__":
     output_folder = r"C:\Users\ToreH\OneDrive - Københavns Universitet\Skole\02456 Deep Learning\Project\DeepLearningProject\output"
+    
+    load_ini_model = True
+    save_final_model = True
+    final_model_path = r"C:\Source\DeepLearningProject\IniModel6464\model_final.pt"
+    ini_model_path = final_model_path # r"C:\Source\DeepLearningProject\IniModel6464\iniModel5000.pt"
 
     # Testing Net
     environmentName = 'LunarLander-v2'  #'CartPole-v0'  #
-    hiddenSize = 128
+    hiddenSizes = [64,64]
 
     env = gym.make(environmentName)
 
@@ -23,18 +28,22 @@ if __name__ == "__main__":
     nActions = env.action_space.n
 
     # training settings
-    num_episodes = 2000
-    batch_size = 8         # hyper 1 parameter #10 is good
-    lr_policy = 0.01        # hyper 2 parameter #0.05 is good ()
+    batch_size = 10         # hyper 1 parameter #10 is good
+    num_episodes = (5000//batch_size)*batch_size
+    val_freq = ((num_episodes//10)//batch_size)*batch_size
+
+    lr_policy = 0.002        # hyper 2 parameter #0.05 is good ()
     use_baseline = True     # hyper 3 parameter
 
     rollout_limit = 500  # max rollout length
-    discount_factor = 0.98  # reward discount factor (gamma), 1.0 = no discount
+    discount_factor = 1.0  # reward discount factor (gamma), 1.0 = no discount
 
-    val_freq = 100  # validation frequency
 
     # setup policy network
-    policy = PolicyNet(nInputs, hiddenSize, nActions)
+    #policy = PolicyNet(nInputs, hiddenSize, nActions)
+    policy = PolicyNetDouble(nInputs, hiddenSizes, nActions)
+    if(load_ini_model):
+        policy.load_state_dict(torch.load(ini_model_path))
 
     optimizer = optim.Adam(policy.parameters(), lr=lr_policy)
 
@@ -56,3 +65,7 @@ if __name__ == "__main__":
     tv.format(0, 'Iteration (training)', 'Training reward', [0, num_episodes])
     tv.format(1, 'Iteration (validation)', 'Validation reward', [0, num_episodes//val_freq])
     tv.start(update_interval=0.25)
+
+    # save final model
+    if(save_final_model):
+        torch.save(policy.state_dict(), final_model_path)
