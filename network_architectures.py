@@ -26,7 +26,7 @@ class PolicyNet(nn.Module):
         return action, actionProbabilities
 
 
-class ValueNet(nn.module):
+class ValueNet(nn.Module):
     def __init__(self, inFeatures, hiddenSize):
         super(ValueNet, self).__init__()
 

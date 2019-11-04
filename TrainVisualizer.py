@@ -1,8 +1,9 @@
 import matplotlib.pyplot as plt
+import os
 
 
 class TrainTracker:
-    def __init__(self, data_containers, train_thread, smooth_alphas=1):
+    def __init__(self, data_containers, train_thread, smooth_alphas=1, out_filepaths=None):
         if(not hasattr(data_containers, '__len__')):
             data_containers = [data_containers]
         self.n = len(data_containers)
@@ -17,15 +18,25 @@ class TrainTracker:
 
         self.data_containers = data_containers
         self.train_thread = train_thread
-        self.cursors = [0] * self.n
-        self.previous_end_data = [None] * self.n
+        self.cursors = [1] * self.n
+        self.previous_end_data = [0] * self.n
         self.previous_smooth_data = [None] * self.n
+        self.visualize = False
+
+        self.out_files = [None] * self.n
+        if(out_filepaths is not None):
+            if(not hasattr(out_filepaths, '__len__')):
+                out_filepaths = [out_filepaths]
+            for i in range(min(self.n, len(out_filepaths))):
+                os.makedirs(os.path.dirname(out_filepaths[i]), exist_ok=True)
+                self.out_files[i] = open(out_filepaths[i], 'w')
 
     def initialize(self):
+        self.visualize = True
         self.fig, self.axes = plt.subplots(self.n, 1)
         return self.axes
 
-    def format(self, id=0, xlabel=None, ylabel=None, xlim=None, ylim=None):
+    def format(self, id=0, xlabel=None, ylabel=None, xlim=None, ylim=None, logy=False):
         ax = self.axes[id]
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
@@ -33,40 +44,55 @@ class TrainTracker:
             ax.set_xlim(xlim)
         if(ylim is not None):
             ax.set_ylim(ylim)
+        if(logy):
+            ax.set_yscale('log')
 
     def start(self, update_interval=0.5):
         while(self.train_thread.is_alive()):
             self._update()
             plt.pause(update_interval)
+
         self._update()
+        for i in range(self.n):
+            if(self.out_files[i] is not None):
+                self.out_files[i].close()
         plt.show()
 
     def _update(self):
         for i in range(self.n):
+            # A) extract recent data
             data = self.data_containers[i].extract_data()
             count = len(data)
             if(count == 0):
                 continue
 
-            xs = [self.cursors[i] - 1] + list(range(self.cursors[i], self.cursors[i] + count))
-            ys = [self.previous_end_data[i]] + data
-            self.previous_end_data[i] = data[-1]
-            self.axes[i].plot(xs, ys, color='gray', lw=0.25)
+            # B) write to output files
+            if(self.out_files[i] is not None):
+                for j in range(count):
+                    self.out_files[i].write(str(data[j]) + "\n")
 
-            if(self.smooth_active[i]):
-                smooth_data = self._exponential_smoothing(self.previous_smooth_data[i], data, self.smooth_alphas[i])
-                if(smooth_data is not None):
-                    xs = [self.cursors[i] - 1] + list(range(self.cursors[i], self.cursors[i] + count))
-                    ys = [self.previous_smooth_data[i]] + smooth_data
-                    self.axes[i].plot(xs, ys, color='g', lw=1)
-                    self.previous_smooth_data[i] = smooth_data[-1]
+            if(self.visualize):
+                # C) plot raw data
+                xs = [self.cursors[i] - 1] + list(range(self.cursors[i], self.cursors[i] + count))
+                ys = [self.previous_end_data[i]] + data
+                self.previous_end_data[i] = data[-1]
+                self.axes[i].plot(xs, ys, color='gray', lw=0.25)
 
-            self.cursors[i] += count
+                # D) plot smooth data
+                if(self.smooth_active[i]):
+                    smooth_data = self._exponential_smoothing(self.previous_smooth_data[i], data, self.smooth_alphas[i])
+                    if(smooth_data is not None):
+                        xs = [self.cursors[i] - 1] + list(range(self.cursors[i], self.cursors[i] + count))
+                        ys = [self.previous_smooth_data[i]] + smooth_data
+                        self.axes[i].plot(xs, ys, color='g', lw=1)
+                        self.previous_smooth_data[i] = smooth_data[-1]
+
+                self.cursors[i] += count
 
     def _exponential_smoothing(self, start, data, alpha):
         if(data is None):
             return None
-        
+
         if(not hasattr(data, '__len__')):
             data = [data]
 
@@ -74,33 +100,5 @@ class TrainTracker:
         for i in range(len(data)):
             data[i] = alpha*data[i] + (1-alpha)*current
             current = data[i]
-        
+
         return data
-
-
-
-
-# def visualize_training(dataContainers, threadTrain):
-#     n = len(dataContainers)
-#     cursors = [0] * n
-#     lastPoints = [None] * n
-#     lastSmooth = [None] * n
-
-#     smooth = [True] * n
-
-#     fig, axes = plt.subplots(n, 1)
-#     while(threadTrain.is_alive()):
-
-#         for i in range(n):
-#             data = dataContainers[i].extract_data()
-#             n2 = len(data)
-#             smooth = _exponential_smoothing()
-
-#             axes[i].plot([cursors[i]-1] + list(range(cursors[i], cursors[i] + n2)), [lastPoints[i]] + data, color='g', lw=0.25)
-#             cursors[i] = cursors[i] + n2
-#             if(n2 > 0):
-#                 lastPoints[i] = data[-1]
-
-#         plt.pause(0.5)
-
-
