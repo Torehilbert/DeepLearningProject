@@ -6,8 +6,8 @@ import time
 import os
 
 from Tracker import Tracker
-from Architectures import PolicyNetDouble
-from Trainer import REINFORCETrainer as trainer
+from Architectures import ActorCritic
+from Trainer import A2CTrainer as trainer
 
 
 LUNAR_LANDER = 'LunarLander-v2'
@@ -20,12 +20,10 @@ if __name__ == "__main__":
     final_model = (True, r"C:\Source\DeepLearningProject\output\model_final.pt")
     os.makedirs(output_folder, exist_ok=True)
 
-    hiddenSizes = [64, 64]
-    number_of_batches = 10
-    batch_size = 10
-    validation_frequency = 2
-    learning_rate = 0.002
-    use_baseline = True
+    hiddenSizes = [16, 16]
+    number_of_episodes = 10
+    validation_frequency = 50
+    learning_rate = 0.01
     rollout_limit = 500
     discount_factor = 1.0
 
@@ -34,7 +32,7 @@ if __name__ == "__main__":
     env = gym.make(environmentName)
 
     # Policy
-    policy = PolicyNetDouble(env.observation_space.shape[0], hiddenSizes, env.action_space.n)
+    policy = ActorCritic(env.observation_space.shape[0], hiddenSizes, env.action_space.n)
     if(initial_model[0]):
         policy.load_state_dict(torch.load(initial_model[1]))
 
@@ -50,10 +48,9 @@ if __name__ == "__main__":
                         model_path_save=final_model[1] if final_model[0] else None)
 
     thread = threading.Thread(target=trainer.train,
-                                kwargs={'number_of_batches': number_of_batches,
-                                        'batch_size': batch_size,
+                                kwargs={'episodes': number_of_episodes,
                                         'val_freq': validation_frequency,
-                                        'use_baseline': use_baseline})
+                                        'weight_actor': 0.5})
     thread.start()
     time.sleep(1)
 
@@ -64,4 +61,5 @@ if __name__ == "__main__":
                         train_thread=thread,
                         smooth_alphas=[0.05, 1],
                         out_filepaths=[csv_train_rewards, csv_eval_rewards])
+    tv.initialize()
     tv.start(update_interval=0.25)
