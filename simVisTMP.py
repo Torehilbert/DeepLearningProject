@@ -5,14 +5,13 @@ import threading
 import time
 import os
 
-from TrainVisualizer import TrainTracker
+from Tracker import Tracker
 from network_architectures import PolicyNet, PolicyNetDouble
-from ReinforcementTrainer import ReinforcementTrainer as RLTrainer
 
 
 if __name__ == "__main__":
     environmentName = 'LunarLander-v2'  #'CartPole-v0'  #
-    folder = r"C:\Source\DeepLearningProject\IniModel6464"
+    folder = r"C:\Source\DeepLearningProject\output_lunar_lander_solved_250k"
     model = "model_final.pt"
     policy_file_path = os.path.join(folder,model)
     
