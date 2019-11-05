@@ -18,18 +18,19 @@ if __name__ == "__main__":
     output_folder = r"C:\Source\DeepLearningProject\output"
     initial_model = (False, r"C:\Source\DeepLearningProject\Input\model_initial.pt")
     final_model = (True, r"C:\Source\DeepLearningProject\output\model_final.pt")
+    os.makedirs(output_folder, exist_ok=True)
 
     hiddenSizes = [64, 64]
-    number_of_batches = 25000
+    number_of_batches = 2500
     batch_size = 10
-    validation_frequency = 500
+    validation_frequency = 2
     learning_rate = 0.002
     use_baseline = True
     rollout_limit = 500
     discount_factor = 1.0
 
     # Environment
-    environmentName = LUNAR_LANDER
+    environmentName = CART_POLE
     env = gym.make(environmentName)
 
     # Policy
