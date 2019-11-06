@@ -1,0 +1,2 @@
+python simVisTMP.py
+pause

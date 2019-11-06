@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 import os
 import random 
+import time
 
 from TimeManager import TimeManager as TM
 from Data import Data
@@ -20,6 +21,8 @@ class BaseTrainer:
 
         self.data_buffer_train = Data()
         self.data_buffer_eval = Data()
+
+        self._save_model_counter = 0
 
     def train():
         raise NotImplementedError()
@@ -50,7 +53,9 @@ class BaseTrainer:
 
     def _save_model(self):
         if(self.model_path_save is not None):
-            torch.save(self.network.state_dict(), self.model_path_save)
+            actual_path = self.model_path_save.split('.')[0] + "_%d"%self._save_model_counter + self.model_path_save.split('.')[1]
+            self._save_model_counter += 1
+            torch.save(self.network.state_dict(), actual_path)
 
 
 class REINFORCETrainer(BaseTrainer):
@@ -133,6 +138,7 @@ class A2CTrainer(BaseTrainer):
 
     def train(self, episodes=100, val_freq=10, weight_actor=0.5, weight_entropy=0.001):
         print("Training started...")
+        t0 = time.time()
         for episode in range(episodes):
             self.network.train()
 
@@ -188,4 +194,74 @@ class A2CTrainer(BaseTrainer):
                 print(' %d%% : Validation reward: %d' % ((100 * (episode + 1) / episodes), validation_reward))
 
         self._save_model()
-        print("Training ended")
+        t1 = time.time()
+        print("Training ended: %f"%(t1-t0))
+
+
+class A2CTrainerTorchify(BaseTrainer):
+    def __init__(self, network, environment, optimizer, rollout_limit, discount_factor, model_path_save=None):
+        super(A2CTrainerTorchify, self).__init__(network, environment, optimizer, rollout_limit, discount_factor, model_path_save)
+
+    def train(self, episodes=100, val_freq=10, weight_actor=0.5, weight_entropy=0.001):
+        print("Training started...")
+        t0 = time.time()
+        n_outputs = self.env.action_space.n
+        for episode in range(episodes):
+            self.network.train()
+
+            actions = []
+            prob_dist = []
+            values = []
+            rewards = []
+
+            state = self.env.reset()
+            for j in range(self.rollout_limit):
+                policy_dist, value = self.network(torch.from_numpy(np.atleast_2d(state)).float())
+                action = (random.random() < np.cumsum(np.squeeze(policy_dist.detach().numpy()))).argmax()
+                state_next, r, done, _ = self.env.step(action)
+
+                actions.append(action)
+                prob_dist.append(policy_dist)
+
+                values.append(value)
+                
+                rewards.append(r)
+                state = state_next
+
+                if(done):
+                    break
+            
+            actions = torch.Tensor([actions]).to(torch.int64).view(-1, 1)
+            prob_dist = torch.stack(prob_dist, dim=1).squeeze(0)
+            values = torch.stack(values)
+
+            log_prob_dist = torch.log(prob_dist)
+            log_probs = log_prob_dist.gather(1, actions).view(-1)     
+            entropy_mean = torch.mean(prob_dist * log_prob_dist)
+  
+            qvals = np.zeros(len(rewards))
+            qval = rewards[-1]
+            for t in reversed(range(len(rewards))):
+                qval = rewards[t] + self.discount_factor * qval
+                qvals[t] = qval
+   
+            qvals = torch.FloatTensor(qvals)
+
+            advantage = qvals - values
+            actor_loss = - weight_actor * (log_probs * advantage.detach()).mean()
+            critic_loss = (1 - weight_actor) * 0.5 * (advantage * advantage).mean()
+            entropy_loss = weight_entropy * entropy_mean
+            loss = actor_loss + critic_loss + entropy_loss
+
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+
+            self.data_buffer_train.add_data([np.sum(rewards)])
+            if((episode + 1) % val_freq == 0):
+                validation_reward = self.validate()
+                print(' %d%% : Validation reward: %d' % ((100 * (episode + 1) / episodes), validation_reward))
+
+        self._save_model()
+        t1 = time.time()
+        print("Training ended: %f"%(t1-t0))

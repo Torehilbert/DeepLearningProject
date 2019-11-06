@@ -16,7 +16,7 @@ if __name__ == "__main__":
     environmentName = LUNAR_LANDER
     #folder = r"C:\Source\DeepLearningProject\output_lunar_lander_solved_250k"
     folder = r"C:\Source\DeepLearningProject\output"
-    model = "model_final.pt"
+    model = "model_final_5pt"
     policy_file_path = os.path.join(folder, model)
 
     env = gym.make(environmentName)
@@ -27,6 +27,9 @@ if __name__ == "__main__":
     #policy = PolicyNetDouble(nInputs, hiddenSizes, nActions)
     policy = ActorCritic(nInputs, hiddenSizes, nActions)
     policy.load_state_dict(torch.load(policy_file_path))
+
+    for param in policy.parameters():
+        print(param.data)
 
     s = env.reset()
     for _ in range(3000):

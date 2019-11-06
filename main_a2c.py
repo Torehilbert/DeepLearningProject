@@ -8,6 +8,7 @@ import os
 from Tracker import Tracker
 from Architectures import ActorCritic
 from Trainer import A2CTrainer as trainer
+from Trainer import A2CTrainerTorchify as trainerTest
 
 
 LUNAR_LANDER = 'LunarLander-v2'
@@ -20,15 +21,15 @@ if __name__ == "__main__":
     final_model = (True, r"C:\Source\DeepLearningProject\output\model_final.pt")
     os.makedirs(output_folder, exist_ok=True)
 
-    hiddenSizes = [16, 16]
-    number_of_episodes = 10
-    validation_frequency = 50
-    learning_rate = 0.01
+    hiddenSizes = [64, 64]
+    number_of_episodes = 100000
+    validation_frequency = 500
+    learning_rate = 0.002
     rollout_limit = 500
     discount_factor = 1.0
 
     # Environment
-    environmentName = CART_POLE
+    environmentName = LUNAR_LANDER
     env = gym.make(environmentName)
 
     # Policy
@@ -40,7 +41,7 @@ if __name__ == "__main__":
     optimizer = optim.Adam(policy.parameters(), lr=learning_rate)
 
     # Trainer
-    trainer = trainer(network=policy,
+    trainer = trainerTest(network=policy,
                         environment=env,
                         optimizer=optimizer,
                         rollout_limit=rollout_limit,
@@ -61,5 +62,5 @@ if __name__ == "__main__":
                         train_thread=thread,
                         smooth_alphas=[0.05, 1],
                         out_filepaths=[csv_train_rewards, csv_eval_rewards])
-    tv.initialize()
+    #tv.initialize()
     tv.start(update_interval=0.25)
