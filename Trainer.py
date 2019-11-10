@@ -11,18 +11,25 @@ import REINFORCE
 
 
 class BaseTrainer:
-    def __init__(self, network, environment, optimizer, rollout_limit, discount_factor, model_path_save=None):
+    def __init__(self, network, environment, optimizer, rollout_limit, discount_factor, path_output=None):
         self.network = network
         self.env = environment
         self.optimizer = optimizer
         self.rollout_limit = rollout_limit
         self.discount_factor = discount_factor
-        self.model_path_save = model_path_save
 
         self.data_buffer_train = Data()
         self.data_buffer_eval = Data()
 
-        self._save_model_counter = 0
+        self.path_output_folder = path_output
+        self.path_models_folder = os.path.join(path_output, 'models') if path_output is not None else None
+        self.path_tracks_folder = os.path.join(path_output, 'tracks') if path_output is not None else None
+        self.path_final_model = os.path.join(path_output, 'model.pt') if path_output is not None else None
+        self.path_info_file = os.path.join(path_output, 'info.txt') if path_output is not None else None
+
+        os.makedirs(self.path_output_folder, exist_ok=True)
+        os.makedirs(self.path_models_folder, exist_ok=True)
+        os.makedirs(self.path_tracks_folder, exist_ok=True)
 
     def train():
         raise NotImplementedError()
@@ -39,7 +46,7 @@ class BaseTrainer:
                 break
         return rollout 
 
-    def validate(self, count=10):
+    def validate(self, count=10, index=None):
         self.network.eval()
         with torch.no_grad():
             rollouts = [self.simulate_rollout(self.rollout_limit, False) for i in range(count)]
@@ -48,14 +55,27 @@ class BaseTrainer:
         for i in range(len(rollouts)):
             total_rewards.append(np.sum(np.array(rollouts[i])[:, 2]))
         self.data_buffer_eval.add_data(total_rewards)
+
+        self._save_model(path=os.path.join(self.path_models_folder, '%d.pt' % index))
         self._save_model()
+        self._save_info()
         return np.mean(total_rewards)
 
-    def _save_model(self):
-        if(self.model_path_save is not None):
-            actual_path = self.model_path_save.split('.')[0] + "_%d"%self._save_model_counter + self.model_path_save.split('.')[1]
-            self._save_model_counter += 1
-            torch.save(self.network.state_dict(), actual_path)
+    def _save_model(self, path=None, state_dict=None):
+        if(state_dict is None):
+            state_dict = self.network.state_dict()
+
+        if(path is not None):
+            torch.save(state_dict, path)
+        elif(self.path_final_model is not None):
+            torch.save(state_dict, self.path_final_model)
+
+    def _save_info(self):
+        if(self.path_info_file is not None):
+            env_name = self.env.unwrapped.spec.id
+            f = open(self.path_info_file, 'w')
+            f.write(env_name)
+            f.close()
 
 
 class REINFORCETrainer(BaseTrainer):
@@ -132,136 +152,185 @@ class A2CTrainerTD(BaseTrainer):
         print("Training ended")
 
 
-class A2CTrainer(BaseTrainer):
-    def __init__(self, network, environment, optimizer, rollout_limit, discount_factor, model_path_save=None):
-        super(A2CTrainer, self).__init__(network, environment, optimizer, rollout_limit, discount_factor, model_path_save)
+class A2CTrainerNG(BaseTrainer):
+    def __init__(self, network, environment, optimizer, rollout_limit, discount_factor, path_output=None):
+        super(A2CTrainerNG, self).__init__(network, environment, optimizer, rollout_limit, discount_factor, path_output)
+        self.data_buffer_loss = Data()
+        self.data_buffer_actor_loss = Data()
+        self.data_buffer_critic_loss = Data()
+        self.data_buffer_entropy_loss = Data()
+        self.data_buffer_gradient_norm = Data()
 
-    def train(self, episodes=100, val_freq=10, weight_actor=0.5, weight_entropy=0.001):
-        print("Training started...")
-        t0 = time.time()
+    def train(self, episodes=100, val_freq=10):
+
         for episode in range(episodes):
-            self.network.train()
-
             log_probs = []
-            entropies = []
             values = []
-            actions = []
             rewards = []
+            actions = []
+            masks = []
+            entropies = []
 
             state = self.env.reset()
-            for j in range(self.rollout_limit):
+            self.network.train()
+            for step in range(self.rollout_limit):
+                # Evaluate network
                 policy_dist, value = self.network(torch.from_numpy(np.atleast_2d(state)).float())
+                values.append(value)
+
+                # action
                 action = (random.random() < np.cumsum(np.squeeze(policy_dist.detach().numpy()))).argmax()
-                state_next, r, done, _ = self.env.step(action)
+                actions.append(action)
 
-                log_prob = torch.log(policy_dist.squeeze(0)[action])
-                entropy = -torch.sum(policy_dist * torch.log(policy_dist))
+                # Take step
+                state_next, reward, done, _ = self.env.step(action)
+                rewards.append(reward)
+                masks.append(1.0 - done)
 
-                log_probs.append(log_prob)
+                # Entropy
+                entropy = -(policy_dist.log() * policy_dist).sum()
                 entropies.append(entropy)
 
-                values.append(value)
-                actions.append(actions)
-                rewards.append(r)
-                state = state_next
+                # Log probabilities
+                log_prob = policy_dist[0, action].log()
+                log_probs.append(log_prob)
 
+                state = state_next
                 if(done):
                     break
 
-            qvals = np.zeros(len(rewards))
-            qval = rewards[-1]
-            for t in reversed(range(len(rewards))):
-                qval = rewards[t] + self.discount_factor * qval
-                qvals[t] = qval
+            with torch.no_grad():
+                _, next_value = self.network(torch.from_numpy(np.atleast_2d(state)).float())
+                returns = self.compute_returns(next_value.numpy(), rewards, masks, self.discount_factor)
+                returns = torch.FloatTensor(returns)
 
-            values = torch.stack(values)
-            qvals = torch.FloatTensor(qvals)
             log_probs = torch.stack(log_probs)
+            values = torch.stack(values)
+            entropies = torch.stack(entropies)
 
-            advantage = qvals - values
-            actor_loss = - weight_actor * (log_probs * advantage.detach()).mean()
-            critic_loss = (1 - weight_actor) * 0.5 * (advantage * advantage).mean()
-            entropy_loss = weight_entropy * torch.mean(torch.stack(entropies))
-            loss = actor_loss + critic_loss + entropy_loss
+            advantages = returns - values
+
+            actor_loss = -(log_probs * advantages.detach()).mean()
+            critic_loss = advantages.pow(2).mean()
+            entropy_loss = -entropies.mean()
+            loss = 1.0 * actor_loss + 0.5 * critic_loss + 0.01 * entropy_loss  # should be parameterized
 
             self.optimizer.zero_grad()
             loss.backward()
+            gnorm = torch.nn.utils.clip_grad_norm_(self.network.parameters(), 0.5)
             self.optimizer.step()
 
             self.data_buffer_train.add_data([np.sum(rewards)])
+            self.data_buffer_loss.add_data([loss.detach().numpy()])
+            self.data_buffer_actor_loss.add_data([actor_loss.detach().numpy()])
+            self.data_buffer_critic_loss.add_data([critic_loss.detach().numpy()])
+            self.data_buffer_entropy_loss.add_data([entropy_loss.detach().numpy()])
+            self.data_buffer_gradient_norm.add_data([gnorm])
+
             if((episode + 1) % val_freq == 0):
-                validation_reward = self.validate()
+                validation_reward = self.validate(index=(episode + 1))
                 print(' %d%% : Validation reward: %d' % ((100 * (episode + 1) / episodes), validation_reward))
 
         self._save_model()
-        t1 = time.time()
-        print("Training ended: %f"%(t1-t0))
+        self._save_info()
+        print("Done")
 
+    def compute_returns(self, next_value, rewards, masks, gamma):
+        r = next_value
+        returns = [0] * len(rewards)
+        for step in reversed(range(len(rewards))):
+            r = rewards[step] + gamma * r * masks[step]
+            returns[step] = r
+        return returns
 
-class A2CTrainerTorchify(BaseTrainer):
-    def __init__(self, network, environment, optimizer, rollout_limit, discount_factor, model_path_save=None):
-        super(A2CTrainerTorchify, self).__init__(network, environment, optimizer, rollout_limit, discount_factor, model_path_save)
+class A2CTrainerStable(BaseTrainer):
+    def __init__(self, network, environment, optimizer, rollout_limit, discount_factor, path_output=None):
+        super(A2CTrainerStable, self).__init__(network, environment, optimizer, rollout_limit, discount_factor, path_output)
+        self.data_buffer_loss = Data()
+        self.data_buffer_actor_loss = Data()
+        self.data_buffer_critic_loss = Data()
+        self.data_buffer_entropy_loss = Data()
+        self.data_buffer_gradient_norm = Data()
 
-    def train(self, episodes=100, val_freq=10, weight_actor=0.5, weight_entropy=0.001):
-        print("Training started...")
-        t0 = time.time()
-        n_outputs = self.env.action_space.n
+    def train(self, episodes=100, val_freq=10):
+
         for episode in range(episodes):
-            self.network.train()
-
-            actions = []
-            prob_dist = []
+            log_probs = []
             values = []
             rewards = []
+            actions = []
+            masks = []
+            entropies = []
 
             state = self.env.reset()
-            for j in range(self.rollout_limit):
+            self.network.train()
+            for step in range(self.rollout_limit):
+                # Evaluate network
                 policy_dist, value = self.network(torch.from_numpy(np.atleast_2d(state)).float())
-                action = (random.random() < np.cumsum(np.squeeze(policy_dist.detach().numpy()))).argmax()
-                state_next, r, done, _ = self.env.step(action)
-
-                actions.append(action)
-                prob_dist.append(policy_dist)
-
                 values.append(value)
-                
-                rewards.append(r)
-                state = state_next
 
+                # action
+                action = (random.random() < np.cumsum(np.squeeze(policy_dist.detach().numpy()))).argmax()
+                actions.append(action)
+
+                # Take step
+                state_next, reward, done, _ = self.env.step(action)
+                rewards.append(reward)
+                masks.append(1.0 - done)
+
+                # Entropy
+                entropy = -(policy_dist.log() * policy_dist).sum()
+                entropies.append(entropy)
+
+                # Log probabilities
+                log_prob = policy_dist[0, action].log()
+                log_probs.append(log_prob)
+
+                state = state_next
                 if(done):
                     break
-            
-            actions = torch.Tensor([actions]).to(torch.int64).view(-1, 1)
-            prob_dist = torch.stack(prob_dist, dim=1).squeeze(0)
+
+            with torch.no_grad():
+                _, next_value = self.network(torch.from_numpy(np.atleast_2d(state)).float())
+                returns = self.compute_returns(next_value.numpy(), rewards, masks, self.discount_factor)
+                returns = torch.FloatTensor(returns)
+
+            log_probs = torch.stack(log_probs)
             values = torch.stack(values)
+            entropies = torch.stack(entropies)
 
-            log_prob_dist = torch.log(prob_dist)
-            log_probs = log_prob_dist.gather(1, actions).view(-1)     
-            entropy_mean = torch.mean(prob_dist * log_prob_dist)
-  
-            qvals = np.zeros(len(rewards))
-            qval = rewards[-1]
-            for t in reversed(range(len(rewards))):
-                qval = rewards[t] + self.discount_factor * qval
-                qvals[t] = qval
-   
-            qvals = torch.FloatTensor(qvals)
+            advantages = returns - values
 
-            advantage = qvals - values
-            actor_loss = - weight_actor * (log_probs * advantage.detach()).mean()
-            critic_loss = (1 - weight_actor) * 0.5 * (advantage * advantage).mean()
-            entropy_loss = weight_entropy * entropy_mean
-            loss = actor_loss + critic_loss + entropy_loss
+            actor_loss = -(log_probs * advantages.detach()).mean()
+            critic_loss = advantages.pow(2).mean()
+            entropy_loss = -entropies.mean()
+            loss = 1.0 * actor_loss + 0.5 * critic_loss + 0.01 * entropy_loss  # should be parameterized
 
             self.optimizer.zero_grad()
             loss.backward()
+            gnorm = torch.nn.utils.clip_grad_norm_(self.network.parameters(), 0.5)
             self.optimizer.step()
 
             self.data_buffer_train.add_data([np.sum(rewards)])
+            self.data_buffer_loss.add_data([loss.detach().numpy()])
+            self.data_buffer_actor_loss.add_data([actor_loss.detach().numpy()])
+            self.data_buffer_critic_loss.add_data([critic_loss.detach().numpy()])
+            self.data_buffer_entropy_loss.add_data([entropy_loss.detach().numpy()])
+            self.data_buffer_gradient_norm.add_data([gnorm])
+
             if((episode + 1) % val_freq == 0):
-                validation_reward = self.validate()
+                validation_reward = self.validate(index=(episode + 1))
                 print(' %d%% : Validation reward: %d' % ((100 * (episode + 1) / episodes), validation_reward))
 
         self._save_model()
-        t1 = time.time()
-        print("Training ended: %f"%(t1-t0))
+        self._save_info()
+        print("Done")
+
+    def compute_returns(self, next_value, rewards, masks, gamma):
+        r = next_value
+        returns = [0] * len(rewards)
+        for step in reversed(range(len(rewards))):
+            r = rewards[step] + gamma * r * masks[step]
+            returns[step] = r
+        returns = np.array(returns)
+        return (returns - np.mean(returns)) / np.std(returns)

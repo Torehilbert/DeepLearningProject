@@ -34,6 +34,7 @@ class Tracker:
     def initialize(self):
         self.visualize = True
         self.fig, self.axes = plt.subplots(self.n, 1)
+        plt.tight_layout()
         return self.axes
 
     def format(self, id=0, xlabel=None, ylabel=None, xlim=None, ylim=None, logy=False):

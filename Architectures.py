@@ -5,20 +5,32 @@ import numpy as np
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, inFeatures, hiddenSizes, outFeatures):
+    def __init__(self, inFeatures, outFeatures):
         super(ActorCritic, self).__init__()
 
-        self.actor = nn.Sequential(nn.Linear(inFeatures, hiddenSizes[0]),
-                                    nn.ReLU(),
-                                    nn.Linear(hiddenSizes[0], hiddenSizes[1]),
-                                    nn.ReLU(),
-                                    nn.Linear(hiddenSizes[1], outFeatures))
+        self.actor = nn.Sequential(
+            nn.Linear(inFeatures, 32),
+            nn.ReLU(),
+            nn.Linear(32, 32),
+            nn.ReLU(),
+            nn.Linear(32, outFeatures)
+        )
 
-        self.critic = nn.Sequential(nn.Linear(inFeatures, hiddenSizes[0]),
-                                    nn.ReLU(),
-                                    nn.Linear(hiddenSizes[0], hiddenSizes[1]),
-                                    nn.ReLU(),
-                                    nn.Linear(hiddenSizes[1], 1))
+        self.critic = nn.Sequential(
+            nn.Linear(inFeatures, 32),
+            nn.ReLU(),
+            nn.Linear(32, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1)
+        )
+
+        for w in self.actor:
+            if isinstance(w, nn.Linear):
+                nn.init.constant_(w.bias, 0.0)
+
+        for w in self.critic:
+            if isinstance(w, nn.Linear):
+                nn.init.constant_(w.bias, 0.0)
 
     def forward(self, x):
         actor_logits = self.actor(x)
@@ -35,6 +47,49 @@ class ActorCritic(nn.Module):
 
         return action, actionProbabilities
 
+
+class ActorCriticStable(nn.Module):
+    def __init__(self, inFeatures, outFeatures):
+        super(ActorCriticStable, self).__init__()
+
+        self.actor = nn.Sequential(
+            nn.Linear(inFeatures, 32),
+            nn.ReLU(),
+            nn.Linear(32, 32),
+            nn.ReLU(),
+            nn.Linear(32, outFeatures)
+        )
+
+        self.critic = nn.Sequential(
+            nn.Linear(inFeatures, 32),
+            nn.ReLU(),
+            nn.Linear(32, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1)
+        )
+
+        for w in self.actor:
+            if isinstance(w, nn.Linear):
+                nn.init.constant_(w.bias, 0.0)
+
+        for w in self.critic:
+            if isinstance(w, nn.Linear):
+                nn.init.constant_(w.bias, 0.0)
+
+    def forward(self, x):
+        actor_logits = self.actor(x)
+        value = self.critic(x)
+        return F.softmax(actor_logits, dim=1), value
+
+    def get_action(self, state, explore=False):
+        with torch.no_grad():
+            actionProbabilities, _ = self(torch.from_numpy(np.atleast_2d(state)).float())
+        if(explore):
+            action = (np.cumsum(actionProbabilities.numpy()) > np.random.rand()).argmax()
+        else:
+            action = (actionProbabilities.numpy()).argmax()
+
+        return action, actionProbabilities
 
 class PolicyNetDouble(nn.Module):
     def __init__(self, inFeatures, hiddenSizes, outFeatures):
