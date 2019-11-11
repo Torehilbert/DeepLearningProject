@@ -41,7 +41,7 @@ if __name__ == "__main__":
         'entropy_weight': 0.001,
         'max_grad_norm_policy': 0.5,
         'max_grad_norm_critic': 0.5,
-        'number_of_episodes': 10000,
+        'number_of_episodes': 100000,
         'rollout_limit': 500,
         'validation_rate': 1000,
         'validation_count': 5,
