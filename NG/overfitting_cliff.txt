@@ -1,3 +1,0 @@
-http://blog.jzhanson.com/blog/rl/project/2018/05/28/breakout.html
-
-https://github.com/jzhanson/breakout-demo/blob/master/a2c.py

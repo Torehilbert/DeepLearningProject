@@ -1,0 +1,16 @@
+used 
+
+hiddensize = 128
+
+        'lr_policy': 1e-2,  # 1e-3
+        'lr_critic': 1e-3,  # 1e-2
+        'gamma': 0.99,
+        'entropy_weight': 0,
+        'max_grad_norm_policy': 0.5,
+        'max_grad_norm_critic': 0.5,
+        'number_of_episodes': 5000,
+        'rollout_limit': 2000,
+        'validation_rate': 200,
+        'validation_count': 5,
+        'validation_rpint': True,
+        'path_output': path_output
