@@ -38,22 +38,19 @@ def LoadCSVSeries(folder, name, extension='.csv'):
 
 
 if __name__ == "__main__":
-    folder = r"C:\Source\DeepLearningProject\Outputs\output DEBUG\tracks"
+    folder = r"C:\Source\DeepLearningProject\Outputs\LunarLander-v2 AC (2019-11-11) (21-53-19) PART 2\tracks"
 
     reward_train = LoadCSVSeries(folder, 'train_reward')
-    loss_total = LoadCSVSeries(folder, 'loss_total')
     loss_actor = LoadCSVSeries(folder, 'loss_actor')
     loss_critic = LoadCSVSeries(folder, 'loss_critic')
     loss_entropy = LoadCSVSeries(folder, 'loss_entropy')
 
     PlotReward(reward_train, title='Total training reward')
     PlotLosses([
-        loss_total,
         loss_actor,
         loss_critic,
         loss_entropy],
-        ['Loss (Total)',
-         'Loss (Actor)',
+        ['Loss (Actor)',
          'Loss (Critic)',
          'Loss (Entropy)']
     )
