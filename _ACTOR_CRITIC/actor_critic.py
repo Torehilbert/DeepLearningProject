@@ -2,7 +2,6 @@ import numpy as np
 import random
 import torch
 import torch.optim as optim
-from torch.optim.lr_scheduler import ExponentialLR
 import os
 import time
 import sys
@@ -11,7 +10,6 @@ import copy
 shared_path = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), '_SHARED')
 sys.path.append(shared_path)
 
-from Data import Data
 from Data import DataMaster
 
 
@@ -29,6 +27,7 @@ DEFAULT_ROLLOUT_LIMIT = 500
 DEFAULT_VALIDATION_RATE = 50
 DEFAULT_VALIDATION_COUNT = 10
 DEFAULT_VALIDATION_PRINT = True
+DEFAULT_VALIDATION_SAVE_MODEL = False
 DEFAULT_OUTPUT_PATH = r"C:\Source\DeepLearningProject\Outputs\latest"
 
 
@@ -51,7 +50,7 @@ class BaseTrainer:
         self.validation_rate = kwargs['validation_rate'] if 'validation_rate' in kwargs else DEFAULT_VALIDATION_RATE
         self.validation_count = kwargs['validation_count'] if 'validation_count' in kwargs else DEFAULT_VALIDATION_COUNT
         self.validation_print = kwargs['validation_print'] if 'validation_print' in kwargs else DEFAULT_VALIDATION_PRINT
-
+        self._save_model_for_each_validation = kwargs['validation_save_model'] if 'validation_save_model' in kwargs else DEFAULT_VALIDATION_SAVE_MODEL
         self.path_output_folder = kwargs['path_output'] if 'path_output' in kwargs else DEFAULT_OUTPUT_PATH
         self.path_models_folder = os.path.join(self.path_output_folder, 'models')
         self.path_tracks_folder = os.path.join(self.path_output_folder, 'tracks')
@@ -62,11 +61,6 @@ class BaseTrainer:
         os.makedirs(self.path_tracks_folder, exist_ok=True)
 
         self._create_data_instance()
-
-        # self.data_buffer_train = Data()
-        # self.data_buffer_eval = Data()
-        # self.data_buffer_loss_policy = Data()
-        # self.data_buffer_loss_entropy = Data()
 
     def _create_data_instance(self):
         csv_paths = [
@@ -106,7 +100,8 @@ class BaseTrainer:
                 else:
                     print('Validation reward: %.3f' % validation_reward)
 
-            self._save_model(network=self.policy, path=os.path.join(self.path_models_folder, 'P%d.pt' % (episode + 1)))
+            if(self._save_model_for_each_validation):
+                self._save_model(network=self.policy, path=os.path.join(self.path_models_folder, 'P%d.pt' % (episode + 1)))
             self._save_model(network=self.policy, path=self.path_final_model_policy)
         return validation_reward
 
@@ -129,7 +124,6 @@ class ActorCriticTrainer(BaseTrainer):
         self.max_grad_norm_critic = kwargs['max_grad_norm_critic'] if 'max_grad_norm_critic' in kwargs else DEFAULT_MAX_GRAD_CRITIC
 
         self.path_final_model_critic = os.path.join(self.path_output_folder, 'critic.pt')
-        # self.data_buffer_loss_critic = Data()
 
     def train(self, number_of_episodes=None, rollout_limit=None):
         t0 = time.time()
@@ -202,10 +196,6 @@ class ActorCriticTrainer(BaseTrainer):
                 self.validate_custom(episode, number_of_episodes)
 
             self.data.add_data_array(data=[np.sum(rewards), np.mean(losses_critic), np.mean(losses_policy), np.mean(losses_entropy)], ids=[0, 2, 3, 4])
-            # self.data_buffer_train.add_data([np.sum(rewards)])
-            # self.data_buffer_loss_critic.add_data([np.mean(losses_critic)])
-            # self.data_buffer_loss_policy.add_data([np.mean(losses_policy)])
-            # self.data_buffer_loss_entropy.add_data([np.mean(losses_entropy)])
 
         t1 = time.time()
         self._save_model(network=self.policy, path=self.path_final_model_policy)
@@ -216,6 +206,7 @@ class ActorCriticTrainer(BaseTrainer):
 
     def validate_custom(self, episode=None, episodes_total=None):
         validation_reward = self.validate(episode, episodes_total)
-        self._save_model(network=self.critic, path=os.path.join(self.path_models_folder, 'C%d.pt' % (episode + 1)))
+        if(self._save_model_for_each_validation):
+            self._save_model(network=self.critic, path=os.path.join(self.path_models_folder, 'C%d.pt' % (episode + 1)))
         self._save_model(network=self.critic, path=self.path_final_model_critic)
         return validation_reward

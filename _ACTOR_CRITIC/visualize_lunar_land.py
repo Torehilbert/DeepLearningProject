@@ -2,43 +2,58 @@ import gym
 import torch
 import numpy as np
 import time
-import sys
+import argparse
+import os
 
 from network_policy import Policy
 
 
-DEFAULT_ENVIRONMENT = 'LunarLander-v2'
-DEFAULT_POLICY_PATH = r"C:\Source\DeepLearningProject\output\policy.pt"
 DEFAULT_EXPLORE = False
 DEFAULT_ROLLOUT_LIMIT = 1500
-DEFAULT_HIDDEN = 31
-DEFAULT_REPS = 1
+DEFAULT_REPS = 10
+
+
+def extract_info_data(path):
+    f = open(path, 'r')
+    cont = f.read()
+    f.close()
+    info_data = {}
+    for line in cont.split("\n"):
+        splits = line.split(" = ")
+        if(len(splits) > 1):
+            info_data[splits[0]] = splits[1]
+    return info_data
+
 
 if __name__ == "__main__":
-    # Read arguments
-    args = sys.argv[1:]
-    environment_name = args[0] if len(args) >= 1 else DEFAULT_ENVIRONMENT
-    policy_path = args[1] if len(args) >= 2 else DEFAULT_POLICY_PATH
-    hidden_units = int(args[2]) if len(args) >= 3 else DEFAULT_HIDDEN
-    explore = bool(int(args[3])) if len(args) >= 4 else DEFAULT_EXPLORE
-    rollout_limit = int(args[4]) if len(args) >= 5 else DEFAULT_ROLLOUT_LIMIT
-    reps = int(args[5]) if len(args) >= 6 else DEFAULT_REPS
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data', required=True, type=str)
+    parser.add_argument('--rollout_limit', required=False, type=int, default=DEFAULT_ROLLOUT_LIMIT)
+    parser.add_argument('--explore', required=False, type=bool, default=DEFAULT_EXPLORE)
+    parser.add_argument('--reps', required=False, type=int, default=DEFAULT_REPS)
+    args = parser.parse_args()
+
+    policy_path = os.path.join(args.data, 'policy.pt')
+    info_data = extract_info_data(os.path.join(args.data, 'info.txt'))
+
+    environment_name = info_data['environment']
+    hiddensize = int(info_data['hiddensize'])
 
     # Render
     env = gym.make(environment_name)
     n_inputs = env.observation_space.shape[0]
     n_actions = env.action_space.n
 
-    policy = Policy(n_inputs, n_actions, hidden_units)
+    policy = Policy(n_inputs, n_actions, hiddensize)
     policy.load_state_dict(torch.load(policy_path))
 
     total_rewards = []
-    for rep in range(reps):
+    for rep in range(args.reps):
         rewards = []
         state = env.reset()
-        for i in range(rollout_limit):
+        for i in range(args.rollout_limit):
             env.render()
-            action = policy.get_action(state=state, explore=explore)
+            action = policy.get_action(state=state, explore=args.explore)
             state_next, reward, done, _ = env.step(action)
             state = state_next
             rewards.append(reward)

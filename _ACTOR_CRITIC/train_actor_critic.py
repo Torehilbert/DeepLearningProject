@@ -14,9 +14,6 @@ from actor_critic import ActorCriticTrainer as ActorCriticTrainer
 shared_path = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), '_SHARED')
 sys.path.append(shared_path)
 
-from Tracker import Tracker
-
-
 INITIAL_POLICY_NAME = "policy.pt"
 INITIAL_CRITIC_NAME = "critic.pt"
 
@@ -36,9 +33,11 @@ if __name__ == "__main__":
     parser.add_argument('--hiddensize', '--hs', required=False, type=int, default=128)
     parser.add_argument('--lr_policy', '--lrp', required=False, type=float, default=1e-4)
     parser.add_argument('--lr_critic', '--lrc', required=False, type=float, default=1e-3)
+    parser.add_argument('--sep_target', required=False, type=bool, default=True)
     parser.add_argument('--updrate_target', '--updt', required=False, type=int, default=10)
     parser.add_argument('--vrate', '--vr', required=False, type=int, default=200)
     parser.add_argument('--vcount', '--vc', required=False, type=int, default=10)
+    parser.add_argument('--save_models', required=False, type=bool, default=False)
     args = parser.parse_args()
 
     if(args.out_path is None):
@@ -65,7 +64,7 @@ if __name__ == "__main__":
     kwargs = {
         'lr_policy': args.lr_policy,        # 1e-4
         'lr_critic': args.lr_critic,        # 1e-3
-        'use_separate_target': True,
+        'use_separate_target': args.sep_target,
         'target_update_rate': args.updrate_target,
         'gamma': args.gamma,
         'entropy_weight': args.entropy_weight,
@@ -76,6 +75,7 @@ if __name__ == "__main__":
         'validation_rate': args.vrate,
         'validation_count': args.vcount,
         'validation_rpint': True,
+        'validation_save_model': args.save_models,
         'path_output': args.out_path
     }
     trainer = ActorCriticTrainer(policy, critic, env, **kwargs)
@@ -86,6 +86,7 @@ if __name__ == "__main__":
     time.sleep(1)
 
     f = open(os.path.join(args.out_path, 'info.txt'), 'w')
+    f.write('method = actor-critic' + "\n")
     f.write('environment = ' + args.env + "\n")
     f.write('hiddensize = ' + str(args.hiddensize) + "\n")
     f.write('initial model = ' + str(args.ini_path) + "\n")

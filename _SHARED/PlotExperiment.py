@@ -75,15 +75,16 @@ if __name__ == "__main__":
     for i in range(len(unqs)):
         val = unqs[i]
         dfsub = what[what[PARAMETER_NAME] == val]
+        property_to_plot = 'median'
         if(dfsub.shape[0] > args.xmax):
             endpoint = args.xmax + 1
-            ys = dfsub[('smooth', 'median')].values[args.xmin:endpoint]
+            ys = dfsub[('smooth', property_to_plot)].values[args.xmin:endpoint]
             xs = np.arange(args.xmin, endpoint, 1)
             zs = dfsub[('smooth', 'std')].iloc[args.xmin:endpoint, ]
             lowers = dfsub[('smooth', '<lambda_0>')].iloc[args.xmin:endpoint, ]
             uppers = dfsub[('smooth', '<lambda_1>')].iloc[args.xmin:endpoint, ]
         else:
-            ys = dfsub[('smooth', 'median')].values[args.xmin:]
+            ys = dfsub[('smooth', property_to_plot)].values[args.xmin:]
             xs = np.arange(args.xmin, dfsub.shape[0], 1)
             zs = dfsub[('smooth', 'std')].iloc[args.xmin:, ]
             lowers = dfsub[('smooth', '<lambda_0>')].iloc[args.xmin:, ]
