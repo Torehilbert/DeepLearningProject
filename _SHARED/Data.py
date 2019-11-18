@@ -120,16 +120,17 @@ class DataMaster:
 
 
 class DataUDPReceiver:
-    def __init__(self, n, IP="127.0.0.1", PORT=12000):
-        self.n = n
+    def __init__(self, channels, IP="127.0.0.1", PORT=12000):
+        self.channels = channels
+        self.n = len(channels)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.ip = IP
         self.port = PORT
         self.socket.bind((IP, PORT))
 
-        self.qs = []
-        for i in range(n):
-            self.qs.append(queue.Queue())
+        self.ch_to_queue = {}
+        for i in range(len(channels)):
+            self.ch_to_queue[channels[i]] = queue.Queue()
 
         self.thread_active = True
         self.thread = threading.Thread(target=self._thread_listener)
@@ -137,7 +138,7 @@ class DataUDPReceiver:
 
     def fetch(self, channel):
         max_count = 10000
-        q = self.qs[channel]
+        q = self.ch_to_queue[channel]
 
         data = []
         try:
@@ -147,12 +148,12 @@ class DataUDPReceiver:
         except queue.Empty:
             pass
         finally:
-            return data
+            return [channel] + data if len(data) > 0 else []
 
     def fetch_all(self):
         all_data = []
-        for i in range(self.n):
-            all_data.append(self.fetch(channel=i))
+        for ch in self.channels:
+            all_data.append(self.fetch(channel=ch))
         return all_data
 
     def _thread_listener(self):
@@ -160,8 +161,10 @@ class DataUDPReceiver:
             data, addr = self.socket.recvfrom(1024)
             pack = struct.unpack('%df' % (len(data) // 4), data)
             channel = int(pack[0])
-            for val in pack[1:]:
-                self.qs[channel].put(val)
+            if(channel in self.channels):
+                q = self.ch_to_queue[channel]
+                for val in pack[1:]:
+                    q.put(val)
 
 
 if __name__ == "__main__":

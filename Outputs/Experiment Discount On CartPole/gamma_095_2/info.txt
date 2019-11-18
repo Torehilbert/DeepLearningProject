@@ -1,0 +1,17 @@
+environment = CartPole-v0
+hiddensize = 128
+initial model = None
+lr_policy = 0.0001
+lr_critic = 0.001
+use_separate_target = True
+target_update_rate = 10
+gamma = 0.95
+entropy_weight = 0.01
+max_grad_norm_policy = None
+max_grad_norm_critic = None
+number_of_episodes = 500
+rollout_limit = 2000
+validation_rate = 2
+validation_count = 1
+validation_rpint = True
+path_output = C:\Source\DeepLearningProject\Outputs\Experiment\gamma_095_2

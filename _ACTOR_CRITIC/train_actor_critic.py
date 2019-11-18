@@ -3,6 +3,8 @@ import torch
 import threading
 import os
 import sys
+import time
+import argparse
 from datetime import datetime
 
 from network_policy import Policy
@@ -15,84 +17,80 @@ sys.path.append(shared_path)
 from Tracker import Tracker
 
 
-LUNAR_LANDER = 'LunarLander-v2'
-CART_POLE = 'CartPole-v0'
-ENVIRONMENT_NAME = LUNAR_LANDER
-HIDDENSIZE = 256
-
-LOAD_INITIAL_MODELS = True
-INITIAL_MODELS_PATH = r"C:\Source\DeepLearningProject\Outputs\LunarLander-v2 AC (2019-11-11) (23-57-05) PART 1 256"
 INITIAL_POLICY_NAME = "policy.pt"
 INITIAL_CRITIC_NAME = "critic.pt"
 
-PATH_OUTPUT_PARENT = r"C:\Source\DeepLearningProject\Outputs"
-path_output_folder_name = ENVIRONMENT_NAME + " AC " + datetime.now().strftime("(%Y-%m-%d) (%H-%M-%S)")
-path_output = os.path.join(PATH_OUTPUT_PARENT, path_output_folder_name)
-
 
 if __name__ == "__main__":
-    env = gym.make(ENVIRONMENT_NAME)
+    # Arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--env', required=True, type=str)
+    parser.add_argument('--episodes', '--n', required=True, type=int)
+
+    parser.add_argument('--ini_path', '--ipath', required=False, type=str, default=None)
+    parser.add_argument('--out_path', '--opath', required=False, type=str, default=None)
+
+    parser.add_argument('--entropy_weight', '--entw', required=False, type=float, default=0.01)
+    parser.add_argument('--gamma', '--discount_factor', '--g', required=False, type=float, default=0.99)
+    parser.add_argument('--rollout_limit', '--rol', default=2000, required=False, type=int)
+    parser.add_argument('--hiddensize', '--hs', required=False, type=int, default=128)
+    parser.add_argument('--lr_policy', '--lrp', required=False, type=float, default=1e-4)
+    parser.add_argument('--lr_critic', '--lrc', required=False, type=float, default=1e-3)
+    parser.add_argument('--updrate_target', '--updt', required=False, type=int, default=10)
+    parser.add_argument('--vrate', '--vr', required=False, type=int, default=200)
+    parser.add_argument('--vcount', '--vc', required=False, type=int, default=10)
+    args = parser.parse_args()
+
+    if(args.out_path is None):
+        output_parent = r"C:\Source\DeepLearningProject\Outputs"
+        folder_name = args.env + " AC " + datetime.now().strftime("(%Y-%m-%d) (%H-%M-%S)")
+        output_path = os.path.join(output_parent, folder_name)
+        args.out_path = output_path
+
+    # Script
+    env = gym.make(args.env)  # 'LunarLander-v2' 'CartPole-v0'
     n_inputs = env.observation_space.shape[0]
     n_actions = env.action_space.n
 
-    policy = Policy(n_inputs, n_actions, HIDDENSIZE)
-    critic = Critic(n_inputs, HIDDENSIZE)
+    policy = Policy(n_inputs, n_actions, args.hiddensize)
+    critic = Critic(n_inputs, args.hiddensize)
 
-    if(LOAD_INITIAL_MODELS):
-        path_policy = os.path.join(INITIAL_MODELS_PATH, INITIAL_POLICY_NAME)
+    if(args.ini_path is not None):
+        path_policy = os.path.join(args.ini_path, INITIAL_POLICY_NAME)
         policy.load_state_dict(torch.load(path_policy))
-        path_critic = os.path.join(INITIAL_MODELS_PATH, INITIAL_CRITIC_NAME)
+        path_critic = os.path.join(args.ini_path, INITIAL_CRITIC_NAME)
         critic.load_state_dict(torch.load(path_critic))
 
     print('start')
     kwargs = {
-        'lr_policy': 0.2*1e-4,  # 1e-3
-        'lr_critic': 0.2*1e-3,  # 1e-2
+        'lr_policy': args.lr_policy,        # 1e-4
+        'lr_critic': args.lr_critic,        # 1e-3
         'use_separate_target': True,
-        'target_update_rate': 10,
-        'gamma': 0.99,
-        'entropy_weight': 0.001,
+        'target_update_rate': args.updrate_target,
+        'gamma': args.gamma,
+        'entropy_weight': args.entropy_weight,
         'max_grad_norm_policy': None,
         'max_grad_norm_critic': None,
-        'number_of_episodes': 2000,
-        'rollout_limit': 2000,
-        'validation_rate': 200,
-        'validation_count': 10,
+        'number_of_episodes': args.episodes,
+        'rollout_limit': args.rollout_limit,
+        'validation_rate': args.vrate,
+        'validation_count': args.vcount,
         'validation_rpint': True,
-        'path_output': path_output
+        'path_output': args.out_path
     }
     trainer = ActorCriticTrainer(policy, critic, env, **kwargs)
 
     thread = threading.Thread(target=trainer.train)
     thread.start()
 
-    # tracker
-    # csv_train_rewards = os.path.join(trainer.path_tracks_folder, 'train_reward.csv')
-    # csv_eval_rewards = os.path.join(trainer.path_tracks_folder, 'validation_reward.csv')
-    # csv_loss_policy = os.path.join(trainer.path_tracks_folder, 'loss_actor.csv')
-    # csv_loss_critic = os.path.join(trainer.path_tracks_folder, 'loss_critic.csv')
-    # csv_loss_entropy = os.path.join(trainer.path_tracks_folder, 'loss_entropy.csv')
+    time.sleep(1)
 
-    # tv = Tracker(
-    #     data_containers=[
-    #         trainer.data_buffer_train,
-    #         trainer.data_buffer_eval,
-    #         trainer.data_buffer_loss_policy,
-    #         trainer.data_buffer_loss_critic,
-    #         trainer.data_buffer_loss_entropy],
-    #     train_thread=thread,
-    #     smooth_alphas=[0.03, 1, 0.03, 0.03, 0.03],
-    #     out_filepaths=[
-    #         csv_train_rewards,
-    #         csv_eval_rewards,
-    #         csv_loss_policy,
-    #         csv_loss_critic,
-    #         csv_loss_entropy]
-    # )
-    # tv.initialize()
-    # tv.format(id=0, ylabel='R (train)')
-    # tv.format(id=1, ylabel='R (val)')
-    # tv.format(id=2, ylabel='L (actor)')
-    # tv.format(id=3, ylabel='L (critic)')
-    # tv.format(id=4, ylabel='L (entropy)')
-    # tv.start(update_interval=1)
+    f = open(os.path.join(args.out_path, 'info.txt'), 'w')
+    f.write('environment = ' + args.env + "\n")
+    f.write('hiddensize = ' + str(args.hiddensize) + "\n")
+    f.write('initial model = ' + str(args.ini_path) + "\n")
+
+    for key in kwargs:
+        f.write(key + " = " + str(kwargs[key]) + "\n")
+
+    f.close()
