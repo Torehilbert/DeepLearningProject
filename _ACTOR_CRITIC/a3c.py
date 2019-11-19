@@ -7,6 +7,9 @@ import numpy as np
 import random
 import sys
 
+from network_policy import Policy
+
+
 DEFAULT_TMAX = 10
 
 
@@ -17,8 +20,8 @@ class A3CTrainer:
         self.environment_name = environment_name
         self.settings = settings  # args from argparse parser class
 
-        self.optimizer_policy = optim.Adam(self.policy.parameters(), lr=1e-4)
-        self.optimizer_critic = optim.Adam(self.critic.parameters(), lr=1e-3)
+        self.optimizer_policy = optim.Adam(self.policy.parameters(), lr=1e-2)
+        self.optimizer_critic = optim.SGD(self.critic.parameters(), lr=1e-3)
         #   settings.nsteps
         #   settings.nthreads
         #   settings.Tmax
@@ -38,17 +41,19 @@ class A3CTrainer:
         print('Done')
 
     def thread_train(self):
-        policy = copy.deepcopy(self.policy)     # local policy
+        policy = Policy(4, 2, 16)  # copy.deepcopy(self.policy)     # local policy
         critic = copy.deepcopy(self.critic)     # local critic
         env = gym.make(self.environment_name)   # local environment
+        opt = optim.Adam(policy.parameters(), lr=1e-1)
 
         done = True
         while(1):
             counter = 0
             if(done):
                 state = env.reset()
+                total_reward = 0
                 done = False
-
+            #self._debug_print_network(policy)
             # 1) Acquire environment experience
             states = []
             rewards = []
@@ -60,7 +65,8 @@ class A3CTrainer:
                 action = (random.random() < np.cumsum(np.squeeze(policy_distribution.detach().numpy()))).argmax()
                 state_next, reward, done, _ = env.step(action)
                 state_next = torch.from_numpy(np.atleast_2d(state_next)).float()
-
+                
+                total_reward += reward
                 states.append(state)
                 rewards.append(reward)
                 actions.append(action)
@@ -69,105 +75,93 @@ class A3CTrainer:
                 counter += 1
                 state = state_next
                 if(done):
+                    print(total_reward)
                     break
 
             # 2) Gradients from experience
-            policy_dists = torch.stack(policy_dists).squeeze()
+            policy_dists = torch.stack(policy_dists).squeeze(1)
             log_policy_dists = torch.log(policy_dists + 1e-9)
             actions = torch.from_numpy(np.array(actions)).long().view(-1, 1)
             log_prob = log_policy_dists.gather(1, actions)
 
             states = torch.stack(states).squeeze()
 
-            value_next = critic(state).detach() if not done else 0
-            returns = np.zeros(shape=(counter,))
-            for t in reversed(range(counter)):
-                value_next = rewards[t] + self.settings.discount * value_next
-                returns[t] = value_next
-            
+            #value_next = 0  # critic(state).detach() if not done else 0
+            returns = np.zeros(shape=(len(rewards),))
+            for t in reversed(range(len(rewards) - 1)):
+                returns[t] = rewards[t] + self.settings.discount * returns[t + 1]
+            #print(returns)
             returns = torch.from_numpy(returns).float()
-            values = critic(states).squeeze()
-            advantages = returns - values
+            #values = critic(states).squeeze()
+            #advantages = returns - values
 
-            critic.zero_grad()
-            loss_critic = (advantages * advantages).sum()
-            loss_critic.backward()
+            #critic.zero_grad()
+            #loss_critic = (advantages * advantages).sum()
+            #loss_critic.backward()
 
-            policy.zero_grad()
-            loss_policy = -(log_prob * advantages.detach()).sum()
+            opt.zero_grad()
+            loss_policy = -(log_prob * returns.detach()).mean()
             loss_policy.backward()
+            opt.step()
 
             # 3) Send gradients to global network
-            self.update_global(policy_local=policy, critic_local=critic)
-            sys.exit(1)
-
-            print(advantages.size())
-            print(returns.size())
-            print(states.size())
-
-     
-            sys.exit(1)
-
-            out = critic(states).squeeze()
-            print("State size: ", state.size())
-            print("States size: ", states.size())
-            print("Out size: ", out.size())
-            sys.exit(1)
-
+            #self.update_global(policy_local=policy, critic_local=critic)
+            #print("\nAFTER")
+            #self._debug_print_network(policy)
+            #sys.exit()
             # Manage global training status
             self.Tlock.acquire()
-            self.T += t
+            self.T += counter
             exit_flag = 1 if self.T > self.settings.Tmax else 0
             self.Tlock.release()
             if(exit_flag):
                 break
 
     def update_global(self, policy_local, critic_local):  # policy_params, critic_params):
-        # 1) Transfer gradients
-        policy_params = [p.grad for p in policy_local.parameters()]
-        critic_params = [p.grad for p in critic_local.parameters()]
-        self.lock_params.acquire()
-        self.policy.zero_grad()
-        idx_counter = 0
-        for p in self.policy.parameters():
-            p.grad = policy_params[idx_counter]
-            idx_counter += 1
-        
-        self.critic.zero_grad()
-        idx_counter = 0
-        for p in self.critic.parameters():
-            p.grad = critic_params[idx_counter]
-            idx_counter += 1
-        
-        # 2) Optimizer step
+        self.optimizer_policy.zero_grad()
+        for lp, gp in zip(policy_local.parameters(), self.policy.parameters()):
+            gp._grad = lp.grad
         self.optimizer_policy.step()
-        self.optimizer_critic.step()
+        policy_local.load_state_dict(self.policy.state_dict())
 
-        # 3) Transfer global weights to local
-        policy_weights = [p.data for p in policy_local.parameters()]
-        critic_weights = [p.data for p in critic_local.parameters()]
-        
-        idx_counter = 0
-        for p in policy_local.parameters():
-            p.data.copy_(policy_weights[idx_counter])
-            idx_counter += 1
+        # # 1) Transfer gradients
+        # policy_grads = [p.grad for p in policy_local.parameters()]
+        # critic_grads = [p.grad for p in critic_local.parameters()]
+        # self.lock_params.acquire()
+        # self.policy.zero_grad()
+        # idx_counter = 0
+        # for p in self.policy.parameters():
+        #     p.grad = policy_grads[idx_counter].detach()
+        #     idx_counter += 1
 
-        idx_counter = 0
-        for p in critic_local.parameters():
-            p.data.copy_(critic_weights[idx_counter])
-            idx_counter += 1
-        
-        self.lock_params.release()
+        # self.critic.zero_grad()
+        # idx_counter = 0
+        # for p in self.critic.parameters():
+        #     p.grad = critic_grads[idx_counter].detach()
+        #     idx_counter += 1
+
+        # # 2) Optimizer step
+        # self.optimizer_policy.step()
+        # self.optimizer_critic.step()
+      
+        # # 3) Transfer global weights to local
+        # policy_local.load_state_dict(self.policy.state_dict())
+        # critic_local.load_state_dict(self.critic.state_dict())
+        # self.lock_params.release()
+
+    def _debug_print_network(self, network):
+        for p in network.parameters():
+            print(p.data)
 
 
 if __name__ == "__main__":
     class DummySettings:
         def __init__(self):
-            self.nsteps = 100
+            self.nsteps = 1000
             self.nthreads = 1
-            self.Tmax = 1000
-            self.discount = 0.99
-    
+            self.Tmax = 10000
+            self.discount = 1.00
+
     from network_policy import Policy
     from network_critic import Critic
     env_name = 'CartPole-v0'
