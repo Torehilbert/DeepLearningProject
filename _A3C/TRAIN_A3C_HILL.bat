@@ -1,0 +1,2 @@
+python main_a3c.py --env="MountainCar-v0" --lr_policy=1e-4 --lr_critic=1e-3 --output_path="C:\Source\DeepLearningProject\Outputs\A3C_mountain" --max_episodes=100000 --num_envs=12 --entropy_weight=1.00 --rollout_limit=5000
+pause

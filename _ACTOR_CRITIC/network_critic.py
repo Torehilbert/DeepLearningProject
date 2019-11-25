@@ -5,6 +5,9 @@ class Critic(nn.Module):
     def __init__(self, inFeatures, hiddensize=32):
         super(Critic, self).__init__()
 
+        self.inFeatures = inFeatures
+        self.hiddensize = hiddensize
+
         self.layers = nn.Sequential(
             nn.Linear(inFeatures, hiddensize),
             nn.ReLU(),

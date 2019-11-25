@@ -48,7 +48,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--channels', '--ch', '--c', '-c', nargs="+", default=[0], required=False, type=int)
     parser.add_argument('--names', nargs="+", required=False, type=str)
-    parser.add_argument('--buffersize', '--size', default=100, required=False, type=int)
+    parser.add_argument('--buffersize', '--size', default=500, required=False, type=int)
     args = parser.parse_args()
 
     channels = args.channels

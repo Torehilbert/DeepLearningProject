@@ -1,0 +1,16 @@
+env = LunarLander-v2
+lr_policy = 0.0001
+lr_critic = 0.001
+discount = 0.99
+hiddensize = 128
+num_steps = 10
+num_envs = 6
+train_reward_alpha = 0.99
+rollout_limit = 500
+entropy_weight = 0.01
+validation_count = 10
+render = False
+render_pause = 1
+output_path = C:\Source\DeepLearningProject\Outputs\Experiment A3C Cores\06_4
+max_steps = None
+max_episodes = 20000

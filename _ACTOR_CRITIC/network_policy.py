@@ -8,6 +8,10 @@ class Policy(nn.Module):
     def __init__(self, inFeatures, outFeatures, hiddensize=32):
         super(Policy, self).__init__()
 
+        self.inFeatures = inFeatures
+        self.outFeatures = outFeatures
+        self.hiddensize = hiddensize
+
         self.layers = nn.Sequential(
             nn.Linear(inFeatures, hiddensize),
             nn.ReLU(),
