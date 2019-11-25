@@ -55,6 +55,10 @@ if __name__ == "__main__":
     for i in range(len(groups_idx)):
         ax.fill_between(df_plot['Episodes'], df_plot['Group %d min' % (i+1)], df_plot['Group %d max' % (i+1)], alpha=0.3)
         plt.plot(df_plot['Episodes'], df_plot['Group %d mean' % (i+1)])
+    plt.legend(['0.01', '1.00'])
+    plt.title('Entropy weight')
+    plt.ylabel('Validation reward')
+    plt.xlabel('Episodes')
     plt.show()
 
 

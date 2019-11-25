@@ -55,7 +55,9 @@ if __name__ == "__main__":
     for i in range(len(groups_idx)):
         ax.fill_between(df_plot[x_name], df_plot['Group %d min' % (i+1)], df_plot['Group %d max' % (i+1)], alpha=0.3)
         plt.plot(df_plot[x_name], df_plot['Group %d mean' % (i+1)])
-    plt.legend(['1', '6'])
+    plt.legend(['1 process', '6 processes'])
+    plt.ylabel('Validation reward')
+    plt.xlabel('Wallclock time (s)')
     plt.show()
 
 
