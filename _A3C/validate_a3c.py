@@ -4,6 +4,7 @@ import gym
 import torch
 import numpy as np
 import os
+import sys
 
 
 def validate(policy_global, critic_global, steps_count, episode_count, args):
@@ -67,7 +68,10 @@ def validate(policy_global, critic_global, steps_count, episode_count, args):
 
 
 def render(policy_global, args):
-    env = gym.make(args.env)
+    if(args.env == 'ATC-v0'):
+        env = ATCv0()
+    else:
+        env = gym.make(args.env)
     policy = copy.deepcopy(policy_global)
 
     while(1):

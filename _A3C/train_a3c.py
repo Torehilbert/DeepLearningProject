@@ -5,10 +5,11 @@ import copy
 import numpy as np
 import random
 import math
+import sys
+import os
 
 
 def train(policy_global, critic_global, steps_global, episode_count, steps_lock, args):
-
     env = gym.make(args.env)
 
     policy_local = copy.deepcopy(policy_global)
@@ -80,7 +81,11 @@ def train(policy_global, critic_global, steps_global, episode_count, steps_lock,
         loss_policy = -(log_probs * advantages.detach()).sum()
 
         entropy = -(log_policy_dists * policy_dists).sum()
-        loss_entropy = -args.entropy_weight * entropy
+        if(args.entropy_weight_end is None):
+            W = args.entropy_weight
+        else:
+            W = args.entropy_weight + (args.entropy_weight_end - args.entropy_weight) * (episode_count.value / args.max_episodes)
+        loss_entropy = -W * entropy
 
         loss = loss_policy + loss_entropy
         optimizer_policy.zero_grad()

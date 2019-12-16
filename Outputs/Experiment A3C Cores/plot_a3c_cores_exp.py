@@ -6,10 +6,17 @@ from scipy.interpolate import interp1d
 
 
 if __name__ == "__main__":
+    colors = [(197 / 255, 225 / 255, 111 / 255), (41 / 255, 126 / 255, 124 / 255), (29 / 255, 52 / 255, 78 / 255)]
     parent_path = r"C:\Source\DeepLearningProject\Outputs\Experiment A3C Cores"
-    groups_idx = [[0, 1, 2, 3, 4, 5], [9,10,11,12,13,14]]
-    x = np.linspace(0, 1500, 1001)
+    groups_idx = [[0, 1, 2, 3, 4, 5], [9, 10, 11, 12, 13, 14]]
+    x = np.linspace(0, 6000, 1001)
+    #x = np.linspace(0, 20000, 1001)
     x_name = 'Time'  # 'Episodes'
+    #x_name = 'Episodes'
+    PLOT_LABEL_X = 'Wallclock time (s)'
+    #PLOT_LABEL_X = x_name
+
+
     subfolders = os.listdir(parent_path)
 
     xs = []
@@ -23,98 +30,43 @@ if __name__ == "__main__":
         data_path = os.path.join(parent_path, sub, 'log.csv')
         df = pd.read_csv(data_path)
         df['Index'] = idx
+        xsub = x[x < np.max(df[x_name].values)]
         f = interp1d(df[x_name], df['Reward'])
         df_smooth = pd.DataFrame()
-        df_smooth[x_name] = x
+        df_smooth[x_name] = xsub
         df_smooth['Index'] = idx
-        df_smooth['Reward'] = f(x)
+        df_smooth['Reward'] = f(xsub)
         df_smooth['Reward Smooth'] = df_smooth['Reward'].ewm(alpha=0.05).mean()
         dfs.append(df_smooth)
         idx += 1
     
     df = pd.concat(dfs)
-    #df.to_csv('test.csv')
-    print(df)
+    df.to_csv('test.csv')
     counter = 0
-    df_plot = pd.DataFrame()
+
+    ax = plt.subplot(1, 1, 1)
+    max_smooth_reward = -10000000
     for idx in groups_idx:
         counter += 1
         group_indicies = df['Index'].isin(idx)
-        group = df[group_indicies].groupby(x_name)
+        dfsub = df[group_indicies]
+        group = dfsub.groupby(x_name)
+        xsub = list(group.groups.keys())
+
         df_mean = group.mean()
-        print(df_mean)
         df_min = group.min()
         df_max = group.max()
-        df_plot[x_name] = x
-        df_plot['Group %d mean' % counter] = df_mean['Reward Smooth'].values
-        df_plot['Group %d min' % counter] = df_min['Reward Smooth'].values
-        df_plot['Group %d max' % counter] = df_max['Reward Smooth'].values
-    
-    print(df_plot)
-    ax = plt.subplot(1, 1, 1)
-    for i in range(len(groups_idx)):
-        ax.fill_between(df_plot[x_name], df_plot['Group %d min' % (i+1)], df_plot['Group %d max' % (i+1)], alpha=0.3)
-        plt.plot(df_plot[x_name], df_plot['Group %d mean' % (i+1)])
-    plt.legend(['1 process', '6 processes'])
+        if(np.max(df_mean['Reward Smooth']) > max_smooth_reward):
+            max_smooth_reward = np.max(df_mean['Reward Smooth'])
+        ax.fill_between(xsub, df_min['Reward Smooth'].values, df_max['Reward Smooth'].values, alpha=0.3, color=colors[counter - 1])
+        plt.plot(xsub, df_mean['Reward Smooth'].values, color=colors[counter - 1])
+    plt.axhline(y=max_smooth_reward, color='black', alpha=0.3, linestyle='--', lw=1)
+
+    plt.title('Number of processes in LunarLander-v2')
+    plt.legend(['1 process', '6 processes', 'Max reward'])
     plt.ylabel('Validation reward')
-    plt.xlabel('Wallclock time (s)')
+    plt.xlabel(PLOT_LABEL_X)
+    plt.xlim([np.min(x), np.max(x)])
+    plt.ylim([0, 280])
+    plt.tight_layout()
     plt.show()
-
-
-
-    # plt.figure()
-    # for idx in groups_idx:
-    #     plt.plot(df['Episodes'].values[df['Index'].isin(idx)], 
-    #             df['Reward Smooth'].values[df['Index'].isin(idx)])
-    # plt.show()
-
-
-    # x = np.linspace(0, minxmax, 1000)
-    # alpha = 0.95
-    # xsf = []
-    # ysf = []
-    # ysfe = []
-    # for i in range(len(xs)):
-    #     f = interp1d(xs[i], ys[i])
-    #     xsf.append(x)
-    #     ysf.append(f(x))
-    #     exsmooth = np.empty_like(ysf[-1])
-    #     for j in range(len(ysf[-1])):
-    #         if(j==0):
-    #             val = ysf[-1][j]
-    #         else:
-    #             val = alpha * val + (1 - alpha) * ysf[-1][j]
-    #         exsmooth[j] = val
-    #     ysfe.append(exsmooth)
-
-    # ysfe = np.array(ysfe)
-
-    # # Plot
-    # colors = [(197 / 255, 225 / 255, 111 / 255), (41 / 255, 126 / 255, 124 / 255)] #, (29 / 255, 52 / 255, 78 / 255)]
-    # groups_idx = [[0,1,2], [3,4,5]]
-    
-    # ax = plt.subplot(1,1,1)
-    # for idx, color in zip(groups_idx, colors):
-    #     print(idx)
-    #     mean = np.mean(ysfe[idx, :], axis=0)
-    #     lower = np.min(ysfe[idx, :], axis=0)
-    #     upper = np.max(ysfe[idx, :], axis=0)
-    #     #print(mean)
-    #     print(x.shape)
-    #     ax.fill_between(x, lower, upper, color=color)
-    #     plt.plot(x, mean, color=color)
-    
-    # plt.show()
-
-    # plt.figure()
-    # mean_series = np.empty_like(ysfe[-1])
-    # upper = np.empty_like(ysfe[-1])
-    # lower = np.empty_like(ysfe[-1])
-    
-    # for i in range(len(idx_g1)):
-    #     mean_series
-
-
-    # for i in range(len(xsf)):
-    #     plt.plot(xsf[i], ysfe[i])
-    # plt.show()
