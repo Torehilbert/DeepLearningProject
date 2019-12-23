@@ -6,10 +6,12 @@ from scipy.interpolate import interp1d
 
 
 if __name__ == "__main__":
-    colors = [(197 / 255, 225 / 255, 111 / 255), (41 / 255, 126 / 255, 124 / 255), (29 / 255, 52 / 255, 78 / 255)]
+    colors = [(197 / 255, 225 / 255, 111 / 255), (41 / 255, 126 / 255, 124 / 255), (29 / 255, 52 / 255, 78 / 255), (1,0,0), (0,1,0)]
     parent_path = r"C:\Source\DeepLearningProject\Outputs\Experiment A3C Cores"
+    parent_path = r"C:\Users\ToreH\Desktop\LunarLander Results"
     groups_idx = [[0, 1, 2, 3, 4, 5], [9, 10, 11, 12, 13, 14]]
-    x = np.linspace(0, 6000, 1001)
+    groups_idx = [list(range(0,15)), list(range(15,30)), list(range(30,45)), list(range(45,60))]
+    x = np.linspace(1, 8000, 1001)
     #x = np.linspace(0, 20000, 1001)
     x_name = 'Time'  # 'Episodes'
     #x_name = 'Episodes'
@@ -63,10 +65,12 @@ if __name__ == "__main__":
     plt.axhline(y=max_smooth_reward, color='black', alpha=0.3, linestyle='--', lw=1)
 
     plt.title('Number of processes in LunarLander-v2')
-    plt.legend(['1 process', '6 processes', 'Max reward'])
+    plt.legend(['1', '6', '12', '23'])
     plt.ylabel('Validation reward')
     plt.xlabel(PLOT_LABEL_X)
     plt.xlim([np.min(x), np.max(x)])
+    plt.xlim([48, np.max(x)])
     plt.ylim([0, 280])
     plt.tight_layout()
+    ax.set_xscale('log')
     plt.show()
