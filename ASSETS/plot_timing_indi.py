@@ -70,7 +70,6 @@ if __name__ == "__main__":
     x_name = args.x
 
     subfolders = os.listdir(args.data_path)
-    subfolders.sort()
 
     xs = []
     idx = 0
@@ -92,6 +91,8 @@ if __name__ == "__main__":
         idx += 1
 
     df = pd.concat(dfs)
+    print(df)
+    
     counter = 0
 
     ax = plt.subplot(1, 1, 1)
@@ -109,13 +110,21 @@ if __name__ == "__main__":
         plt.plot(xsub, df_mean['Reward'].values, color=args.colors[0], linestyle=args.ltypes[0]) 
     else:
         for idx in args.groups:
-            group_indices = df['Index'].isin(idx)
-            dfsub = df[group_indices]
-            group = dfsub.groupby(x_name)
-            xsub = list(group.groups.keys())
-            df_mean, df_std = group.mean(), group.std()
-            ax.fill_between(xsub, df_mean['Reward'].values - df_std['Reward'].values, df_mean['Reward'].values + df_std['Reward'].values, alpha=0.3)
-            plt.plot(xsub, df_mean['Reward'].values, linestyle=args.ltypes[counter])
+            color = ['red', 'blue', 'green'][counter]
+            if(counter != 1):
+                counter += 1
+                continue
+
+            for i in idx:
+                plt.figure()
+                dfsub = df[df['Index']==i]
+                plt.plot(dfsub[x_name], dfsub['Reward'].values, color=color)
+                # group = dfsub.groupby(x_name)
+                # xsub = list(group.groups.keys())
+                # df_mean, df_std = group.mean(), group.std()
+                # df_mean.to_csv("dfmean%d.csv"%counter, index=False)
+                # ax.fill_between(xsub, df_mean['Reward'].values - df_std['Reward'].values, df_mean['Reward'].values + df_std['Reward'].values, alpha=0.3)
+                # plt.plot(xsub, df_mean['Reward'].values, linestyle=args.ltypes[counter])
             counter += 1
 
     plt.title(args.title)
