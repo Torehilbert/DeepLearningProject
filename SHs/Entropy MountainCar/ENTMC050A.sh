@@ -11,7 +11,7 @@
 #BSUB -e logs/%J.err
 
 module load python3/3.6.2
-python3 ~/DLProject/_A3C/main_a3c.py --env="MountainCar-v0" --lr_policy=1e-4 --lr_critic=1e-3 --output_path="OutputEntMC/050_01" --max_episodes=100000 --num_envs=23 --entropy_weight=0.50 --hiddensize=128 --rollout_limit=500 --num_steps=10
-python3 ~/DLProject/_A3C/main_a3c.py --env="MountainCar-v0" --lr_policy=1e-4 --lr_critic=1e-3 --output_path="OutputEntMC/050_02" --max_episodes=100000 --num_envs=23 --entropy_weight=0.50 --hiddensize=128 --rollout_limit=500 --num_steps=10
-python3 ~/DLProject/_A3C/main_a3c.py --env="MountainCar-v0" --lr_policy=1e-4 --lr_critic=1e-3 --output_path="OutputEntMC/050_03" --max_episodes=100000 --num_envs=23 --entropy_weight=0.50 --hiddensize=128 --rollout_limit=500 --num_steps=10
-python3 ~/DLProject/_A3C/main_a3c.py --env="MountainCar-v0" --lr_policy=1e-4 --lr_critic=1e-3 --output_path="OutputEntMC/050_04" --max_episodes=100000 --num_envs=23 --entropy_weight=0.50 --hiddensize=128 --rollout_limit=500 --num_steps=10
+python3 ~/DLProject/_A3C/main_a3c.py --env="MountainCar-v0" --lr_policy=1e-4 --lr_critic=1e-3 --output_path="OutputEntMC/050_05" --max_episodes=100000 --num_envs=23 --entropy_weight=0.50 --hiddensize=128 --rollout_limit=500 --num_steps=10
+python3 ~/DLProject/_A3C/main_a3c.py --env="MountainCar-v0" --lr_policy=1e-4 --lr_critic=1e-3 --output_path="OutputEntMC/050_06" --max_episodes=100000 --num_envs=23 --entropy_weight=0.50 --hiddensize=128 --rollout_limit=500 --num_steps=10
+python3 ~/DLProject/_A3C/main_a3c.py --env="MountainCar-v0" --lr_policy=1e-4 --lr_critic=1e-3 --output_path="OutputEntMC/050_07" --max_episodes=100000 --num_envs=23 --entropy_weight=0.50 --hiddensize=128 --rollout_limit=500 --num_steps=10
+python3 ~/DLProject/_A3C/main_a3c.py --env="MountainCar-v0" --lr_policy=1e-4 --lr_critic=1e-3 --output_path="OutputEntMC/050_08" --max_episodes=100000 --num_envs=23 --entropy_weight=0.50 --hiddensize=128 --rollout_limit=500 --num_steps=10
