@@ -120,7 +120,7 @@ if __name__ == "__main__":
 
     plt.title(args.title)
     if(args.legends is not None):
-        plt.legend(args.legends)
+        plt.legend(args.legends, loc=4)
     plt.ylabel(args.ylabel)
     plt.xlabel(args.xlabel)
     plt.xlim(args.xrange)
